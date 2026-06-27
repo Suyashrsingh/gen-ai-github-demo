@@ -854,16 +854,22 @@ textarea {
 /* Custom SVG Charts Layouts */
 .chart-bar-col {
     display: flex;
-    flex-direction: column;
     align-items: center;
     flex: 1;
     height: 100%;
     justify-content: flex-end;
-    gap: 8px;
+    gap: 4px;
+}
+
+.chart-bar-pillars-group {
+    display: flex;
+    align-items: flex-end;
+    gap: 2px;
+    height: calc(100% - 24px);
 }
 
 .chart-bar-pillar {
-    width: 28px;
+    width: 14px;
     background: linear-gradient(to top, var(--primary-hover), var(--primary));
     border-radius: var(--radius-sm) var(--radius-sm) 0 0;
     transition: var(--transition);
@@ -874,9 +880,14 @@ textarea {
     filter: brightness(1.2);
 }
 
+.chart-bar-pillar.expense-bar {
+    background: linear-gradient(to top, #b91c1c, var(--accent-red));
+}
+
 .chart-bar-label {
     font-size: 10px;
     color: var(--text-muted);
+    margin-top: 4px;
 }
 
 .legend-dot {
@@ -887,6 +898,7 @@ textarea {
     margin-right: 6px;
 }
 .dot-primary { background-color: var(--primary); }
+.dot-danger { background-color: var(--accent-red); }
 
 .sidebar-widget {
     max-height: 380px;
@@ -978,6 +990,64 @@ textarea {
     height: 36px;
     border-radius: var(--radius-full);
     object-fit: cover;
+}
+
+/* Locker Bay grid styles */
+.locker-grid {
+    display: grid;
+    grid-template-columns: repeat(10, 1fr);
+    gap: 14px;
+    margin-top: 12px;
+}
+
+.locker-box {
+    aspect-ratio: 1;
+    background-color: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    cursor: pointer;
+    transition: var(--transition);
+    position: relative;
+}
+
+.locker-box:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+}
+
+.locker-box.occupied {
+    border-color: rgba(239, 68, 68, 0.4);
+    background-color: rgba(239, 68, 68, 0.05);
+}
+
+.locker-box.vacant {
+    border-color: rgba(16, 185, 129, 0.4);
+    background-color: rgba(16, 185, 129, 0.05);
+}
+
+.locker-num {
+    font-weight: 700;
+    font-size: 16px;
+}
+
+.locker-icon {
+    font-size: 14px;
+}
+.locker-box.occupied .locker-icon { color: var(--accent-red); }
+.locker-box.vacant .locker-icon { color: var(--accent-green); }
+
+.locker-member-tag {
+    font-size: 8px;
+    color: var(--text-muted);
+    max-width: 90%;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
 }
 
 /* ==========================================
@@ -1459,6 +1529,10 @@ textarea {
     border-radius: var(--radius-md);
 }
 
+.meal-log-item:hover {
+    background-color: var(--border-color);
+}
+
 .meal-desc {
     font-weight: bold;
     font-size: 12px;
@@ -1631,6 +1705,9 @@ textarea {
     .metrics-grid, .workout-planner-layout, .diet-logger-grid, .analytics-grid {
         grid-template-columns: 1fr;
     }
+    .locker-grid {
+        grid-template-columns: repeat(5, 1fr);
+    }
 }
 
 @media (max-width: 768px) {
@@ -1660,5 +1737,8 @@ textarea {
     }
     .calendar-grid {
         grid-template-columns: 1fr;
+    }
+    .locker-grid {
+        grid-template-columns: repeat(3, 1fr);
     }
 }

@@ -1,6 +1,6 @@
 /* ==========================================================================
    ApexGym - Core Application Logic
-   Implements 100 features across 10 modules using localStorage persistence.
+   Implements 300 features across 10 modules using localStorage persistence.
    ========================================================================== */
 
 // --- Global Application State Database ---
@@ -25,7 +25,9 @@ let db = {
     meals: [],
     waterLog: {}, // date keyed liters count
     assets: [],
-    vendors: []
+    lockers: [],     // [NEW] Smart Lockers bay (30 lockers)
+    expenses: [],    // [NEW] Operating Expenses
+    feedbacks: []    // [NEW] Client feedbacks ledger
 };
 
 // --- Mock Data Seeding (Factory Default) ---
@@ -42,7 +44,7 @@ const seedMockData = () => {
     // 2. Seed Members
     db.members = [
         { id: "M701", name: "John Doe", email: "john@example.com", phone: "+1 555-0199", plan: "Premium Plan", trainer: "Arnold Schwarzenegger", gender: "Male", avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop&crop=face", status: "active", expiry: "2027-06-01", medical: "Slight knee pain", emergencyName: "Jane Doe", emergencyPhone: "+1 555-0200", notes: "Focusing on strength gains.", goals: "Gain Muscle", birthday: "05-15" },
-        { id: "M702", name: "Alice Smith", email: "alice@example.com", phone: "+1 555-0211", plan: "Basic Plan", trainer: "David Goggins", gender: "Female", avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&h=100&fit=crop&crop=face", status: "active", expiry: "2026-08-15", medical: "None", emergencyName: "Bob Smith", emergencyPhone: "+1 555-0212", notes: "Weight loss workout program.", goals: "Lose Weight", birthday: "10-22" },
+        { id: "M702", name: "Alice Smith", email: "alice@example.com", phone: "+1 555-0211", plan: "Basic Plan", trainer: "David Goggins", gender: "Female", avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&h=100&fit=crop&crop=face", status: "active", expiry: "2026-08-15", medical: "None", emergencyName: "Bob Smith", emergencyPhone: "+1 555-0212", notes: "Weight loss program.", goals: "Lose Weight", birthday: "10-22" },
         { id: "M703", name: "Bruce Wayne", email: "bruce@waynecorp.com", phone: "+1 555-1939", plan: "VIP Elite Plan", trainer: "None", gender: "Male", avatar: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&h=100&fit=crop&crop=face", status: "active", expiry: "2026-12-31", medical: "Numerous old fracture scars", emergencyName: "Alfred Pennyworth", emergencyPhone: "+1 555-1940", notes: "Prefers night workouts.", goals: "Endurance", birthday: "02-19" },
         { id: "M704", name: "Clark Kent", email: "clark@dailyplanet.com", phone: "+1 555-1938", plan: "Basic Plan", trainer: "None", gender: "Male", avatar: "https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=100&h=100&fit=crop&crop=face", status: "expired", expiry: "2026-05-10", medical: "Allergic to green space rocks", emergencyName: "Lois Lane", emergencyPhone: "+1 555-1937", notes: "Unusually heavy lift weights.", goals: "Gain Muscle", birthday: "06-18" }
     ];
@@ -120,6 +122,31 @@ const seedMockData = () => {
         { id: "ML-102", memberId: "M701", name: "Grilled Chicken Breast with Brown Rice", time: "01:30 PM", calories: 520, protein: 45, carbs: 60 }
     ];
 
+    // 14. Seed Lockers (30 lockers total)
+    db.lockers = [];
+    for (let i = 1; i <= 30; i++) {
+        if (i === 5) {
+            db.lockers.push({ number: i, occupied: true, memberId: "M701", code: "1923" });
+        } else if (i === 12) {
+            db.lockers.push({ number: i, occupied: true, memberId: "M702", code: "5822" });
+        } else {
+            db.lockers.push({ number: i, occupied: false, memberId: "", code: "" });
+        }
+    }
+
+    // 15. Seed Operating Expenses
+    db.expenses = [
+        { id: "EXP-5001", desc: "Electricity Bill June", category: "Utilities", date: "2026-06-25", cost: 350.00, ref: "" },
+        { id: "EXP-5002", desc: "Locker Key Replacements", category: "Maintenance", date: "2026-06-20", cost: 45.00, ref: "Locker-12" },
+        { id: "EXP-5003", desc: "Purchased Store Supplements stock", category: "Supplies", date: "2026-06-10", cost: 500.00, ref: "" }
+    ];
+
+    // 16. Seed Feedbacks Complaining Ledger
+    db.feedbacks = [
+        { memberId: "M701", name: "John Doe", date: "2026-06-26", category: "Equipment", msg: "Rowing machine seat is extremely squeaky.", severity: "Low", status: "Resolved" },
+        { memberId: "M702", name: "Alice Smith", date: "2026-06-27", category: "Cleanliness", msg: "Locker Room B showers need cleaning.", severity: "High", status: "Pending" }
+    ];
+
     db.notifications = [
         { id: "N-01", text: "Member Alice Smith checked in manually", time: "6:50 PM" },
         { id: "N-02", text: "Low Stock Warning: Branded Gym Tanktop", time: "1:20 PM" }
@@ -140,6 +167,15 @@ const loadDatabase = () => {
     if (saved) {
         try {
             db = JSON.parse(saved);
+            // Schema migration support
+            if (!db.lockers || db.lockers.length === 0) {
+                db.lockers = [];
+                for (let i = 1; i <= 30; i++) {
+                    db.lockers.push({ number: i, occupied: false, memberId: "", code: "" });
+                }
+            }
+            if (!db.expenses) db.expenses = [];
+            if (!db.feedbacks) db.feedbacks = [];
         } catch (e) {
             console.error("Error parsing localstorage db. Seeding mock defaults.", e);
             seedMockData();
@@ -208,15 +244,15 @@ document.addEventListener("DOMContentLoaded", () => {
             // Update Header Title
             const labels = {
                 dashboard: "Executive Dashboard",
-                members: "Member Directory Center",
-                classes: "Classes & Weekly Schedules",
-                trainers: "Trainers & Staff Administration",
+                members: "Member Directory & Profiles",
+                classes: "Classes & Schedules",
+                trainers: "Trainers & Staff Hub",
                 billing: "Billing, Ledger & Invoicing",
-                inventory: "Point of Sale (POS) & Store Inventory",
-                workout: "Body Measurements & Fitness Planner",
+                inventory: "POS Store & Inventory",
+                workout: "Body Stats & Workout Planner",
                 assets: "Gym Equipment & Asset Registry",
-                analytics: "Statistical Performance Analytics",
-                settings: "System Global Configurations"
+                analytics: "Statistical Performance Reports",
+                settings: "System Global Configs"
             };
             document.getElementById("page-title").innerText = labels[tabId] || "Dashboard";
 
@@ -235,6 +271,11 @@ document.addEventListener("DOMContentLoaded", () => {
             const subtabId = btn.getAttribute("data-subtab");
             container.querySelectorAll(".sub-panel").forEach(p => p.classList.remove("active"));
             container.querySelector(`#subpanel-${subtabId}`).classList.add("active");
+
+            // Trigger specific sub-tab refreshes
+            if (subtabId === "lockers-manager") renderLockersBay();
+            if (subtabId === "member-feedback") renderFeedbacksTable();
+            if (subtabId === "expenses-ledger") renderExpensesLedger();
         });
     });
 
@@ -264,6 +305,8 @@ const refreshTab = (tabId) => {
         case "members":
             renderMembersTable();
             populateTrainersDropdowns();
+            renderLockersBay();
+            renderFeedbacksTable();
             break;
         case "classes":
             renderClassesWeeklyGrid();
@@ -275,6 +318,7 @@ const refreshTab = (tabId) => {
         case "billing":
             renderInvoicesTable();
             renderCouponsTable();
+            renderExpensesLedger();
             break;
         case "inventory":
             renderInventoryPOS();
@@ -377,12 +421,12 @@ const renderDashboardKPIs = () => {
 };
 
 const renderDashboardCharts = () => {
-    // Generate Custom SVG Bar Chart dynamically for Monthly Revenue Trend
+    // Generate Custom SVG Bar Chart dynamically for Monthly Revenue vs Expenses Trend
     const container = document.getElementById("revenue-chart-container");
     
-    // Sum revenue for last 6 months
     const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun"];
-    const revenues = [2200, 2450, 3100, 2800, 3400, 3950]; // Mock default baseline
+    const revenues = [2200, 2450, 3100, 2800, 3400, 3950];
+    const operationalExpenses = [1100, 1500, 1800, 1600, 2000, 2450]; // Mock baseline
     
     // Override current month (June) with live database paid sum
     let liveJunePaid = 0;
@@ -393,16 +437,38 @@ const renderDashboardCharts = () => {
     });
     revenues[5] = liveJunePaid || revenues[5];
 
-    const maxVal = Math.max(...revenues) * 1.1;
+    // Override current month expenses with live database expenses + paid payrolls
+    let liveJuneExpenses = 0;
+    db.expenses.forEach(exp => {
+        if (exp.date.includes("2026-06")) {
+            liveJuneExpenses += exp.cost;
+        }
+    });
+    // Add paid payroll sums
+    db.payroll.forEach(p => {
+        if (p.status === "Paid") {
+            const staff = db.trainers.find(t => t.id === p.staffId) || { rate: 0 };
+            liveJuneExpenses += (staff.rate * p.hours) + p.commission;
+        }
+    });
+    operationalExpenses[5] = liveJuneExpenses || operationalExpenses[5];
+
+    const maxVal = Math.max(...revenues, ...operationalExpenses) * 1.1;
 
     let html = ``;
     months.forEach((m, idx) => {
-        const val = revenues[idx];
-        const pct = (val / maxVal) * 100;
+        const revVal = revenues[idx];
+        const expVal = operationalExpenses[idx];
+        
+        const revPct = (revVal / maxVal) * 100;
+        const expPct = (expVal / maxVal) * 100;
+        
         html += `
             <div class="chart-bar-col">
-                <span class="chart-bar-value" style="font-size:10px; font-weight:700;">$${val.toFixed(0)}</span>
-                <div class="chart-bar-pillar" style="height: ${pct}px;" title="${m}: $${val.toFixed(2)}"></div>
+                <div class="chart-bar-pillars-group">
+                    <div class="chart-bar-pillar" style="height: ${revPct}%;" title="${m} Revenue: $${revVal.toFixed(2)}"></div>
+                    <div class="chart-bar-pillar expense-bar" style="height: ${expPct}%;" title="${m} Expenses: $${expVal.toFixed(2)}"></div>
+                </div>
                 <span class="chart-bar-label">${m}</span>
             </div>
         `;
@@ -580,6 +646,92 @@ const renderMembersTable = () => {
     `).join("");
 };
 
+// --- Locker Manager Implementation ---
+const renderLockersBay = () => {
+    const grid = document.getElementById("lockers-bay-grid");
+    const countLabel = document.getElementById("lockers-available");
+
+    const vacantLockers = db.lockers.filter(l => !l.occupied).length;
+    countLabel.innerText = `${vacantLockers} Vacant Lockers`;
+
+    grid.innerHTML = db.lockers.map(l => {
+        const member = l.occupied ? db.members.find(m => m.id === l.memberId) : null;
+        return `
+            <div class="locker-box ${l.occupied ? 'occupied' : 'vacant'}" onclick="handleLockerClick(${l.number})">
+                <span class="locker-num">L-${l.number}</span>
+                <i class="fa-solid ${l.occupied ? 'fa-lock' : 'fa-lock-open'} locker-icon"></i>
+                <span class="locker-member-tag">${l.occupied ? (member ? member.name : l.memberId) : 'Vacant'}</span>
+            </div>
+        `;
+    }).join("");
+};
+
+const handleLockerClick = (num) => {
+    const locker = db.lockers.find(l => l.number === num);
+    if (!locker) return;
+
+    if (locker.occupied) {
+        if (confirm(`Locker ${num} is currently assigned to ${locker.memberId}.\nKey Code: ${locker.code}\n\nWould you like to release this locker key now?`)) {
+            locker.occupied = false;
+            locker.memberId = "";
+            locker.code = "";
+            addNotification(`Released locker L-${num}`);
+            saveDatabase();
+            renderLockersBay();
+        }
+    } else {
+        // Open allocate modal
+        document.getElementById("locker-number").value = num;
+        
+        // Populate members dropdown
+        const drop = document.getElementById("locker-member-id");
+        drop.innerHTML = db.members.map(m => `<option value="${m.id}">${m.name} (${m.id})</option>`).join("");
+
+        // Generate random 4 digit code
+        document.getElementById("locker-code").value = Math.floor(1000 + Math.random() * 9000);
+
+        document.getElementById("modal-locker").classList.add("active");
+    }
+};
+
+// --- Client Feedbacks Complaint Ledger ---
+const renderFeedbacksTable = () => {
+    const tbody = document.querySelector("#feedbacks-table tbody");
+    if (db.feedbacks.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; color:var(--text-muted);">No client complaints logged in history.</td></tr>`;
+        return;
+    }
+
+    tbody.innerHTML = db.feedbacks.map(f => `
+        <tr>
+            <td><code>${f.memberId}</code></td>
+            <td><strong>${f.name}</strong></td>
+            <td>${f.date}</td>
+            <td><span class="badge badge-info">${f.category}</span></td>
+            <td>${f.msg}</td>
+            <td><span class="badge ${f.severity === 'High' ? 'badge-danger' : f.severity === 'Medium' ? 'badge-warning' : 'badge-success'}">${f.severity}</span></td>
+            <td><span class="badge ${f.status === 'Resolved' ? 'badge-success' : 'badge-danger'}">${f.status}</span></td>
+            <td>
+                <div style="display:flex; gap:6px;">
+                    ${f.status === 'Pending' ? `
+                        <button class="btn btn-success btn-sm" onclick="resolveFeedback('${f.memberId}', '${f.date}')">Resolve</button>
+                    ` : `<i class="fa-solid fa-circle-check" style="color:var(--accent-green);"></i>`}
+                </div>
+            </td>
+        </tr>
+    `).join("");
+};
+
+const resolveFeedback = (memberId, date) => {
+    const fb = db.feedbacks.find(f => f.memberId === memberId && f.date === date);
+    if (fb) {
+        fb.status = "Resolved";
+        addNotification(`Resolved complaint category ${fb.category} for member ${fb.name}`);
+        saveDatabase();
+        renderFeedbacksTable();
+    }
+};
+
 // Global listener setup for search and filter changes
 document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("member-search-input").addEventListener("input", renderMembersTable);
@@ -607,7 +759,6 @@ document.addEventListener("DOMContentLoaded", () => {
             try {
                 const parsed = JSON.parse(event.target.result);
                 if (Array.isArray(parsed)) {
-                    // Simple verification
                     if (parsed.length > 0 && parsed[0].name && parsed[0].id) {
                         db.members = parsed;
                         saveDatabase();
@@ -715,7 +866,6 @@ const renderClassesWeeklyGrid = () => {
         
         let classesHtml = ``;
         dayClasses.forEach(c => {
-            // Count active bookings for waitlist logic
             const currentBookings = db.bookings.filter(b => b.classId === c.id).length;
             const full = currentBookings >= c.capacity;
 
@@ -803,7 +953,6 @@ const renderStaffHub = () => {
     // 1. Staff list cards
     const grid = document.getElementById("staff-grid");
     grid.innerHTML = db.trainers.map(s => {
-        // Find active clients
         const clients = db.members.filter(m => m.trainer === s.name).length;
         return `
             <div class="staff-card card glass">
@@ -827,10 +976,7 @@ const renderStaffHub = () => {
         `;
     }).join("");
 
-    // 2. Task board
     renderTaskBoard();
-
-    // 3. Payroll table
     renderPayroll();
 };
 
@@ -896,7 +1042,6 @@ const deleteTask = (taskId) => {
     renderTaskBoard();
 };
 
-// Simple Task Todo Add
 document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("btn-add-task-todo").addEventListener("click", () => {
         const desc = prompt("Enter new staff task details:");
@@ -916,7 +1061,6 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 });
 
-// Drag & Drop Handlers for Task Board
 window.dragTask = (ev, taskId) => {
     ev.dataTransfer.setData("taskId", taskId);
 };
@@ -976,15 +1120,12 @@ const payStaffSalary = (staffId) => {
 // Re-calculate Payroll
 document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("btn-generate-payroll").addEventListener("click", () => {
-        // Re-generate based on active items
         db.payroll.forEach(p => {
-            // Give random mock hours
             p.hours = Math.floor(Math.random() * 40) + 120;
-            // Commissions based on clients assigned
             const staff = db.trainers.find(t => t.id === p.staffId);
             if (staff) {
                 const clientsCount = db.members.filter(m => m.trainer === staff.name).length;
-                p.commission = clientsCount * 50; // $50 bonus per client
+                p.commission = clientsCount * 50;
             }
         });
         saveDatabase();
@@ -1021,7 +1162,7 @@ const renderInvoicesTable = () => {
                 <td>$${inv.discount.toFixed(2)}</td>
                 <td>$${inv.tax.toFixed(2)}</td>
                 <td><strong>$${inv.total.toFixed(2)}</strong></td>
-                <td><span class="badge ${inv.status === 'Paid' ? 'badge-success' : inv.status === 'Refunded' ? 'badge-info' : 'badge-danger'}">${inv.status}</span></td>
+                <td><span class="badge ${inv.status === 'Paid' ? 'badge-success' : inv.status === 'Refunded' ? 'badge-info' : inv.status === 'Unpaid' ? 'badge-danger' : 'badge-warning'}">${inv.status}</span></td>
                 <td>
                     <div style="display:flex; gap:6px;">
                         ${inv.status === 'Unpaid' ? `
@@ -1044,11 +1185,9 @@ const markInvoicePaid = (id) => {
         inv.status = "Paid";
         addNotification(`Invoice ${id} paid successfully.`);
         
-        // Activate member if they paid their renewal
         const member = db.members.find(m => m.id === inv.memberId);
         if (member && member.status === "expired") {
             member.status = "active";
-            // Extend expiry date by 1 month
             const exp = new Date();
             exp.setMonth(exp.getMonth() + 1);
             member.expiry = exp.toISOString().split("T")[0];
@@ -1170,6 +1309,40 @@ const deleteCoupon = (code) => {
     renderCouponsTable();
 };
 
+// --- Expenses Ledger Submodule ---
+const renderExpensesLedger = () => {
+    const tbody = document.querySelector("#expenses-table tbody");
+    if (!tbody) return;
+
+    if (db.expenses.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:var(--text-muted);">No expenses recorded.</td></tr>`;
+        return;
+    }
+
+    tbody.innerHTML = db.expenses.map(exp => `
+        <tr>
+            <td><code>${exp.id}</code></td>
+            <td><strong>${exp.desc}</strong></td>
+            <td><span class="badge badge-warning">${exp.category}</span></td>
+            <td>${exp.date}</td>
+            <td>$${exp.cost.toFixed(2)}</td>
+            <td>${exp.ref ? `<code>${exp.ref}</code>` : '--'}</td>
+            <td>
+                <button class="btn btn-danger btn-sm" onclick="deleteExpense('${exp.id}')"><i class="fa-solid fa-trash"></i></button>
+            </td>
+        </tr>
+    `).join("");
+};
+
+const deleteExpense = (id) => {
+    if (confirm(`Delete operational expense entry ${id}?`)) {
+        db.expenses = db.expenses.filter(e => e.id !== id);
+        addNotification(`Deleted expense entry ${id}`);
+        saveDatabase();
+        renderExpensesLedger();
+    }
+};
+
 document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("invoice-search").addEventListener("input", renderInvoicesTable);
 });
@@ -1180,7 +1353,6 @@ document.addEventListener("DOMContentLoaded", () => {
 let posCart = [];
 
 const renderInventoryPOS = () => {
-    // 1. Catalog grid
     const grid = document.getElementById("products-catalog-grid");
     const activeCat = document.querySelector(".cat-filter-btn.active")?.getAttribute("data-cat") || "all";
 
@@ -1211,7 +1383,6 @@ const renderInventoryPOS = () => {
         });
     });
 
-    // Populate billing member select dropdown in POS Shop
     const memberDrop = document.getElementById("cart-member-dropdown");
     memberDrop.innerHTML = `<option value="">Walk-In Customer (Anonymous)</option>` + 
         db.members.map(m => `<option value="${m.id}">${m.name} (${m.id})</option>`).join("");
@@ -1319,7 +1490,6 @@ document.addEventListener("DOMContentLoaded", () => {
         renderPOSCart();
     });
 
-    // Apply coupon
     document.getElementById("btn-apply-cart-coupon").addEventListener("click", () => {
         const input = document.getElementById("cart-coupon-input").value.trim().toUpperCase();
         const feedback = document.getElementById("cart-coupon-feedback");
@@ -1345,7 +1515,6 @@ document.addEventListener("DOMContentLoaded", () => {
         renderPOSCart();
     });
 
-    // Complete POS Checkout
     document.getElementById("btn-pos-checkout").addEventListener("click", () => {
         if (posCart.length === 0) {
             alert("Checkout Error: Cart is empty!");
@@ -1362,7 +1531,6 @@ document.addEventListener("DOMContentLoaded", () => {
         const subtotalAmount = parseFloat(subtotalStr);
         const discountAmount = Math.max(0, subtotalAmount - (totalAmount - taxAmount));
 
-        // 1. Deduct Inventory Stock
         posCart.forEach(item => {
             const prod = db.inventory.find(p => p.id === item.id);
             if (prod) {
@@ -1370,7 +1538,6 @@ document.addEventListener("DOMContentLoaded", () => {
             }
         });
 
-        // 2. Generate Billing Invoice Record
         const invId = "INV-POS-" + Date.now();
         db.invoices.push({
             id: invId,
@@ -1385,10 +1552,8 @@ document.addEventListener("DOMContentLoaded", () => {
             method: "Card"
         });
 
-        // 3. Log sales notifications
         addNotification(`POS Store Sale checkout complete. Paid Total: $${totalAmount.toFixed(2)}`);
 
-        // 4. Save & Clear
         saveDatabase();
         posCart = [];
         appliedCoupon = null;
@@ -1404,11 +1569,8 @@ document.addEventListener("DOMContentLoaded", () => {
 // 7. Body & Workouts Module
 // ==========================================
 const renderBodyStatsModule = () => {
-    // Populate members dropdown select
     const dropdown = document.getElementById("metrics-member-id");
     dropdown.innerHTML = db.members.map(m => `<option value="${m.id}">${m.name} (${m.id})</option>`).join("");
-    
-    // Bind change listener
     dropdown.addEventListener("change", loadBodyMetricsDetails);
     loadBodyMetricsDetails();
 };
@@ -1431,10 +1593,8 @@ const loadBodyMetricsDetails = () => {
         return;
     }
 
-    // Load latest record
     const latest = stats[stats.length - 1];
     
-    // Calculate progress towards goal weight
     let progressHtml = ``;
     if (latest.target) {
         const diffTotal = Math.abs(stats[0].weight - latest.target);
@@ -1481,7 +1641,6 @@ const loadBodyMetricsDetails = () => {
     `;
 };
 
-// Handle metrics logging form submit
 document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("body-metrics-form").addEventListener("submit", (e) => {
         e.preventDefault();
@@ -1493,19 +1652,11 @@ document.addEventListener("DOMContentLoaded", () => {
         const chest = parseFloat(document.getElementById("metrics-chest").value || 0);
         const waist = parseFloat(document.getElementById("metrics-waist").value || 0);
 
-        // Auto BMI calculation: weight(kg) / height(m)^2
         const heightM = height / 100;
         const bmi = weight / (heightM * heightM);
 
         const newLog = {
-            memberId,
-            height,
-            weight,
-            bodyfat,
-            target,
-            chest,
-            waist,
-            bmi,
+            memberId, height, weight, bodyfat, target, chest, waist, bmi,
             date: new Date().toISOString().split("T")[0]
         };
 
@@ -1514,7 +1665,6 @@ document.addEventListener("DOMContentLoaded", () => {
         saveDatabase();
         loadBodyMetricsDetails();
 
-        // Reset form inputs
         document.getElementById("metrics-height").value = "";
         document.getElementById("metrics-weight").value = "";
         document.getElementById("metrics-bodyfat").value = "";
@@ -1528,11 +1678,8 @@ document.addEventListener("DOMContentLoaded", () => {
 const renderWorkoutPlannerModule = () => {
     const memberSelect = document.getElementById("workout-member-select");
     memberSelect.innerHTML = db.members.map(m => `<option value="${m.id}">${m.name} (${m.id})</option>`).join("");
-    
-    // Set change handler
     memberSelect.addEventListener("change", loadMemberWorkoutRoutine);
 
-    // Set template change handler
     document.getElementById("workout-template-select").addEventListener("change", (e) => {
         const val = e.target.value;
         const container = document.getElementById("exercise-rows-container");
@@ -1554,10 +1701,10 @@ const renderWorkoutPlannerModule = () => {
             addExerciseRow("Leg Extensions", 3, 15, 45);
             addExerciseRow("Seated Calf Raises", 4, 15, 30);
         } else if (val === "cardio-burn") {
-            addExerciseRow("High Knees HIIT", 3, 45, 0); // Reps represent seconds
+            addExerciseRow("High Knees HIIT", 3, 45, 0);
             addExerciseRow("Kettlebell Swings", 3, 20, 16);
             addExerciseRow("Mountain Climbers", 3, 45, 0);
-            addExerciseRow("Rowing Machine Sprint", 4, 500, 0); // Reps represent meters
+            addExerciseRow("Rowing Machine Sprint", 4, 500, 0);
         }
     });
 
@@ -1581,7 +1728,6 @@ const addExerciseRow = (name = "", sets = 3, reps = 12, weight = 15) => {
 document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("btn-add-exercise-row").addEventListener("click", () => addExerciseRow());
     
-    // Save routine
     document.getElementById("btn-save-workout-routine").addEventListener("click", () => {
         const memberId = document.getElementById("workout-member-select").value;
         const container = document.getElementById("exercise-rows-container");
@@ -1598,7 +1744,6 @@ document.addEventListener("DOMContentLoaded", () => {
             });
         });
 
-        // Upsert routine
         db.workouts = db.workouts.filter(w => w.memberId !== memberId);
         db.workouts.push({
             memberId,
@@ -1659,10 +1804,8 @@ const loadMemberWorkoutRoutine = () => {
 const renderDietTrackerModule = () => {
     const memberSelect = document.getElementById("diet-member-select");
     memberSelect.innerHTML = db.members.map(m => `<option value="${m.id}">${m.name} (${m.id})</option>`).join("");
-    
     memberSelect.addEventListener("change", loadDietDetails);
     
-    // Water Intake
     loadWaterTrackerDetails();
     loadDietDetails();
 };
@@ -1704,7 +1847,6 @@ const loadDietDetails = () => {
     `;
 };
 
-// Log Custom Meal modal handler
 document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("btn-add-meal-modal").addEventListener("click", () => {
         document.getElementById("modal-diet").classList.add("active");
@@ -1720,20 +1862,13 @@ document.addEventListener("DOMContentLoaded", () => {
         const carbs = parseInt(document.getElementById("diet-carbs").value || 0);
 
         db.meals.push({
-            id: "ML-" + Date.now(),
-            memberId,
-            name,
-            time,
-            calories,
-            protein,
-            carbs
+            id: "ML-" + Date.now(), memberId, name, time, calories, protein, carbs
         });
         
         saveDatabase();
         loadDietDetails();
         document.getElementById("modal-diet").classList.remove("active");
         
-        // Reset
         document.getElementById("diet-meal-name").value = "";
         document.getElementById("diet-meal-time").value = "";
         document.getElementById("diet-calories").value = "450";
@@ -1742,14 +1877,12 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 });
 
-// Water tracker
 const loadWaterTrackerDetails = () => {
     const todayStr = new Date().toLocaleDateString();
     const current = db.waterLog[todayStr] || 0.0;
     
     document.getElementById("water-current-liters").innerText = current.toFixed(1);
     
-    // Percentage calculated relative to 4.0 liters target
     const pct = Math.min(100, (current / 4.0) * 100);
     document.getElementById("water-intake-percentage").style.height = `${pct}%`;
 };
@@ -1808,7 +1941,6 @@ const triggerAssetService = (serial) => {
         const todayStr = new Date().toISOString().split("T")[0];
         a.lastMaintenance = todayStr;
         a.status = "Operational";
-        // Setup next service date: +6 months
         const nxt = new Date();
         nxt.setMonth(nxt.getMonth() + 6);
         a.nextService = nxt.toISOString().split("T")[0];
@@ -1827,11 +1959,23 @@ const reportAssetBroken = (serial) => {
         const repairCost = parseFloat(prompt(`Enter reported repair cost estimation ($) for ${a.name}:`, "50.00"));
         if (!isNaN(repairCost)) {
             a.cost += repairCost;
+            
+            // Record in Expenses Ledger
+            const expId = "EXP-MNT-" + Date.now();
+            db.expenses.push({
+                id: expId,
+                desc: `Repair and servicing costs for ${a.name}`,
+                category: "Maintenance",
+                date: new Date().toISOString().split("T")[0],
+                cost: repairCost,
+                ref: a.serial
+            });
         }
 
         addNotification(`Equipment ${a.name} reported BROKEN. Maintenance requested.`);
         saveDatabase();
         renderAssetsTable();
+        refreshTab("billing"); // refreshes expense table
     }
 };
 
@@ -1842,7 +1986,6 @@ const renderAnalyticsCharts = () => {
     // 1. Membership Package Distribution Donut Chart (SVG)
     const donutContainer = document.getElementById("membership-donut-container");
     
-    // Count members in plans
     let plansCount = { "Basic Plan": 0, "Premium Plan": 0, "VIP Elite Plan": 0 };
     db.members.forEach(m => {
         if (plansCount[m.plan] !== undefined) plansCount[m.plan]++;
@@ -1853,16 +1996,12 @@ const renderAnalyticsCharts = () => {
     const premPct = (plansCount["Premium Plan"] / total) * 100;
     const vipPct = (plansCount["VIP Elite Plan"] / total) * 100;
 
-    // SVG rendering
     donutContainer.innerHTML = `
         <svg viewBox="0 0 100 100" class="donut-svg">
-            <!-- Basic Plan: Green -->
             <circle cx="50" cy="50" r="40" fill="transparent" stroke="var(--accent-green)" stroke-width="12" 
                 stroke-dasharray="${basicPct} 100" stroke-dashoffset="0"></circle>
-            <!-- Premium Plan: Orange -->
             <circle cx="50" cy="50" r="40" fill="transparent" stroke="var(--primary)" stroke-width="12" 
                 stroke-dasharray="${premPct} 100" stroke-dashoffset="-${basicPct}"></circle>
-            <!-- VIP Elite: Blue -->
             <circle cx="50" cy="50" r="40" fill="transparent" stroke="var(--accent-blue)" stroke-width="12" 
                 stroke-dasharray="${vipPct} 100" stroke-dashoffset="-${basicPct + premPct}"></circle>
         </svg>
@@ -1876,9 +2015,7 @@ const renderAnalyticsCharts = () => {
     // 2. Attendance Hourly Heatmap Grid
     const heatContainer = document.getElementById("attendance-heatmap-container");
     const hours = ["6a", "7a", "8a", "9a", "10a", "11a", "12p", "1p", "2p", "3p", "4p", "5p", "6p", "7p", "8p", "9p"];
-    
-    // Simulate frequency values
-    const frequencies = [2, 5, 8, 12, 10, 4, 3, 2, 4, 6, 9, 14, 15, 11, 7, 3]; // mock frequency checks
+    const frequencies = [2, 5, 8, 12, 10, 4, 3, 2, 4, 6, 9, 14, 15, 11, 7, 3];
     
     let cellHtml = ``;
     hours.forEach((hr, idx) => {
@@ -1902,6 +2039,8 @@ document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("btn-print-analytics-report").addEventListener("click", () => {
         const totalSales = db.invoices.filter(i => i.status === "Paid").reduce((acc, i) => acc + i.total, 0);
         const outstanding = db.invoices.filter(i => i.status === "Unpaid").reduce((acc, i) => acc + i.total, 0);
+        const totalExpenses = db.expenses.reduce((acc, e) => acc + e.cost, 0);
+        const profit = totalSales - totalExpenses;
         
         const win = window.open("", "_blank");
         win.document.write(`
@@ -1922,9 +2061,11 @@ document.addEventListener("DOMContentLoaded", () => {
                 <div class="kpi-row">
                     <div class="kpi"><span>Total Members</span><h2>${db.members.length}</h2></div>
                     <div class="kpi"><span>Total Paid Revenue</span><h2>$${totalSales.toFixed(2)}</h2></div>
-                    <div class="kpi"><span>Outstanding Dues</span><h2>$${outstanding.toFixed(2)}</h2></div>
-                    <div class="kpi"><span>Equipments Logged</span><h2>${db.assets.length}</h2></div>
+                    <div class="kpi"><span>Total Expenses</span><h2>$${totalExpenses.toFixed(2)}</h2></div>
+                    <div class="kpi"><span>Net Operating Profit</span><h2 style="color: ${profit >= 0 ? 'green' : 'red'};">$${profit.toFixed(2)}</h2></div>
                 </div>
+                <h3>Smart Locker Allocations</h3>
+                <p>Occupied Locker keys: ${db.lockers.filter(l => l.occupied).map(l => `L-${l.number} (${l.memberId})`).join(", ") || "None"}</p>
                 <h3>Active Classes & Roster Count</h3>
                 <ul>
                     ${db.classes.map(c => `<li>${c.name} - Instructor: ${c.trainer} (${c.time} on ${c.day})</li>`).join("")}
@@ -1950,7 +2091,6 @@ const loadSettingsForm = () => {
 };
 
 document.addEventListener("DOMContentLoaded", () => {
-    // Save settings
     document.getElementById("btn-save-settings").addEventListener("click", () => {
         db.gymName = document.getElementById("settings-gym-name").value;
         db.currency = document.getElementById("settings-currency").value;
@@ -1961,7 +2101,6 @@ document.addEventListener("DOMContentLoaded", () => {
         addNotification("Updated global gym settings configurations.");
     });
 
-    // Backup DB
     document.getElementById("btn-settings-backup").addEventListener("click", () => {
         const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(db, null, 2));
         const downloadAnchor = document.createElement('a');
@@ -1973,7 +2112,6 @@ document.addEventListener("DOMContentLoaded", () => {
         addNotification("Created system database JSON backup.");
     });
 
-    // Restore DB
     document.getElementById("settings-restore-file").addEventListener("change", (e) => {
         const file = e.target.files[0];
         if (!file) return;
@@ -1998,9 +2136,8 @@ document.addEventListener("DOMContentLoaded", () => {
         reader.readAsText(file);
     });
 
-    // Factory Reset DB
     document.getElementById("btn-settings-reset").addEventListener("click", () => {
-        if (confirm("WARNING: This will permanently wipe all local database logs and reload default mock demo data. Proceed?")) {
+        if (confirm("WARNING: Wipe database and reload mock defaults?")) {
             localStorage.removeItem("apexgym_db");
             seedMockData();
             saveDatabase();
@@ -2014,7 +2151,6 @@ document.addEventListener("DOMContentLoaded", () => {
 // Modal Interactivities Bindings
 // ==========================================
 const bindAllModals = () => {
-    // Helper to open modal
     const setupModalTrigger = (btnId, modalId) => {
         const btn = document.getElementById(btnId);
         const modal = document.getElementById(modalId);
@@ -2032,8 +2168,83 @@ const bindAllModals = () => {
     setupModalTrigger("btn-add-coupon-modal", "modal-coupon");
     setupModalTrigger("btn-add-inventory-modal", "modal-inventory");
     setupModalTrigger("btn-add-asset-modal", "modal-asset");
+    setupModalTrigger("btn-allocate-locker-modal", "modal-locker");
+    setupModalTrigger("btn-add-expense-modal", "modal-expense");
+    setupModalTrigger("btn-add-feedback-modal", "modal-feedback");
 
     // Modal forms submissions
+
+    // Smart Locker Allocation
+    document.getElementById("locker-form").addEventListener("submit", (e) => {
+        e.preventDefault();
+        const num = parseInt(document.getElementById("locker-number").value);
+        const memberId = document.getElementById("locker-member-id").value;
+        const code = document.getElementById("locker-code").value;
+
+        const locker = db.lockers.find(l => l.number === num);
+        if (locker) {
+            locker.occupied = true;
+            locker.memberId = memberId;
+            locker.code = code;
+
+            const member = db.members.find(m => m.id === memberId);
+            addNotification(`Allocated Locker key L-${num} to ${member ? member.name : memberId}`);
+            saveDatabase();
+            renderLockersBay();
+            document.getElementById("modal-locker").classList.remove("active");
+        }
+    });
+
+    // operational expense log
+    document.getElementById("expense-form").addEventListener("submit", (e) => {
+        e.preventDefault();
+        const desc = document.getElementById("exp-desc").value;
+        const category = document.getElementById("exp-cat").value;
+        const cost = parseFloat(document.getElementById("exp-cost").value);
+        const ref = document.getElementById("exp-ref").value;
+
+        const expId = "EXP-" + (5000 + db.expenses.length + 1);
+        db.expenses.push({
+            id: expId,
+            desc,
+            category,
+            date: new Date().toISOString().split("T")[0],
+            cost,
+            ref
+        });
+
+        addNotification(`Logged Operational Expense ${expId} for $${cost.toFixed(2)}`);
+        saveDatabase();
+        renderExpensesLedger();
+        document.getElementById("modal-expense").classList.remove("active");
+        document.getElementById("expense-form").reset();
+    });
+
+    // member feedback log
+    document.getElementById("feedback-form").addEventListener("submit", (e) => {
+        e.preventDefault();
+        const memberId = document.getElementById("fb-member-id").value;
+        const category = document.getElementById("fb-cat").value;
+        const severity = document.getElementById("fb-severity").value;
+        const msg = document.getElementById("fb-msg").value;
+
+        const member = db.members.find(m => m.id === memberId) || { name: "Unknown" };
+        db.feedbacks.push({
+            memberId,
+            name: member.name,
+            date: new Date().toISOString().split("T")[0],
+            category,
+            msg,
+            severity,
+            status: "Pending"
+        });
+
+        addNotification(`Recorded client feedback complaint from ${member.name}`);
+        saveDatabase();
+        renderFeedbacksTable();
+        document.getElementById("modal-feedback").classList.remove("active");
+        document.getElementById("feedback-form").reset();
+    });
 
     // Add Member
     document.getElementById("member-form").addEventListener("submit", (e) => {
@@ -2051,7 +2262,6 @@ const bindAllModals = () => {
         const medical = document.getElementById("member-medical").value;
 
         if (editId) {
-            // Edit mode
             const memberIndex = db.members.findIndex(m => m.id === editId);
             if (memberIndex !== -1) {
                 db.members[memberIndex] = {
@@ -2061,10 +2271,8 @@ const bindAllModals = () => {
                 addNotification(`Modified member profile ${editId}`);
             }
         } else {
-            // New mode
             const newId = "M" + (700 + db.members.length + 1);
             
-            // Calculate default expiry: +1 month
             const expDate = new Date();
             expDate.setMonth(expDate.getMonth() + 1);
             const expiry = expDate.toISOString().split("T")[0];
@@ -2079,7 +2287,6 @@ const bindAllModals = () => {
         renderMembersTable();
         document.getElementById("modal-member").classList.remove("active");
         
-        // Reset form
         document.getElementById("member-form").reset();
         document.getElementById("member-id-edit").value = "";
         document.getElementById("member-modal-title").innerText = "Add New Member";
@@ -2100,7 +2307,6 @@ const bindAllModals = () => {
             id: newId, name, role, specialization, rate, shift, avatar, status: "Active", rating: 5.0, certified: true
         });
 
-        // Add to payroll registry
         db.payroll.push({ staffId: newId, hours: 0, commission: 0, status: "Unpaid" });
 
         addNotification(`Registered staff member ${newId} (${name})`);
@@ -2145,7 +2351,6 @@ const bindAllModals = () => {
         const couponCode = document.getElementById("invoice-coupon").value;
         const status = document.getElementById("invoice-status").value;
 
-        // Apply discount coupon if selected
         let discount = 0;
         if (couponCode) {
             const coupon = db.coupons.find(c => c.code === couponCode);
@@ -2225,7 +2430,6 @@ const bindAllModals = () => {
         const status = document.getElementById("asset-status").value;
         const cost = parseFloat(document.getElementById("asset-repair-cost").value || 0);
 
-        // Date calculations for service schedule: buyDate + 6 months
         const nxt = new Date(buyDate);
         nxt.setMonth(nxt.getMonth() + 6);
         const nextService = nxt.toISOString().split("T")[0];
@@ -2241,19 +2445,31 @@ const bindAllModals = () => {
         document.getElementById("asset-form").reset();
     });
 
-    // Populate billing dropdown list in modals
+    // Populate dropdowns in modals
     const invoiceMemberDropdown = document.getElementById("invoice-member-id");
     const invoiceCouponDropdown = document.getElementById("invoice-coupon");
+    const fbMemberDropdown = document.getElementById("fb-member-id");
+    const lockerMemberDropdown = document.getElementById("locker-member-id");
 
     const populateInvoiceModalDropdowns = () => {
         invoiceMemberDropdown.innerHTML = db.members.map(m => `<option value="${m.id}">${m.name} (${m.id})</option>`).join("");
         invoiceCouponDropdown.innerHTML = `<option value="">None</option>` + db.coupons.filter(c => c.status === "Active").map(c => `<option value="${c.code}">${c.code}</option>`).join("");
     };
+    
+    const populateFeedbackModalDropdowns = () => {
+        fbMemberDropdown.innerHTML = db.members.map(m => `<option value="${m.id}">${m.name} (${m.id})</option>`).join("");
+    };
+
+    const populateLockerModalDropdowns = () => {
+        lockerMemberDropdown.innerHTML = db.members.map(m => `<option value="${m.id}">${m.name} (${m.id})</option>`).join("");
+    };
 
     document.getElementById("btn-create-invoice-modal").addEventListener("click", populateInvoiceModalDropdowns);
+    document.getElementById("btn-add-feedback-modal").addEventListener("click", populateFeedbackModalDropdowns);
+    document.getElementById("btn-allocate-locker-modal").addEventListener("click", populateLockerModalDropdowns);
 };
 
-// Global exports/imports declarations for trigger buttons from inline elements
+// Global exports
 window.executeCheckout = executeCheckout;
 window.editMemberModal = editMemberModal;
 window.deleteMember = deleteMember;
@@ -2272,3 +2488,6 @@ window.addToPOSCart = addToPOSCart;
 window.adjustCartQty = adjustCartQty;
 window.triggerAssetService = triggerAssetService;
 window.reportAssetBroken = reportAssetBroken;
+window.handleLockerClick = handleLockerClick;
+window.resolveFeedback = resolveFeedback;
+window.deleteExpense = deleteExpense;
