@@ -15,12 +15,18 @@ Because it operates entirely on the client side using browser `localStorage` for
 2. Double-click the [`index.html`](index.html) file to open it directly in your web browser (Chrome, Edge, Safari, Firefox).
 
 ### Method 2: Local Dev Server (Recommended)
-If you want to run it via a local server (e.g. using VS Code Live Server or Python):
-```bash
-# Using Python 3.x
-python -m http.server 8080
-```
-Then open `http://localhost:8080` in your web browser.
+Starting a local server prevents potential browser restriction issues and allows features like imports/exports to work optimally.
+
+1. **Open your terminal or command prompt (cmd)**.
+2. **Navigate into this project directory**:
+   ```bash
+   cd "projects/gym-management-system"
+   ```
+3. **Start the local Python server**:
+   ```bash
+   python -m http.server 8080
+   ```
+4. **Open your browser** and visit: [http://localhost:8080](http://localhost:8080)
 
 ---
 
